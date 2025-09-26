@@ -4,6 +4,40 @@
 import os
 import time
 from typing import Optional, Callable
+# --- Py3.12 distutils shim（必須放在 import undetected_chromedriver 之前）---
+import sys, types, re
+try:
+    import distutils  # type: ignore
+except ModuleNotFoundError:
+    mod_distutils = types.ModuleType("distutils")
+    mod_version = types.ModuleType("distutils.version")
+
+    # 盡量模擬 LooseVersion；若安裝了 packaging 就用它比較，否則用簡單字串拆解比較
+    try:
+        from packaging.version import Version as _PkgVersion, InvalidVersion as _PkgInvalid
+        class LooseVersion(_PkgVersion):  # type: ignore
+            def __init__(self, v="0"):
+                try:
+                    super().__init__(str(v))
+                except _PkgInvalid:
+                    super().__init__(str(v).replace("_", "."))
+    except Exception:
+        class LooseVersion:  # 極簡比較，夠用於 uc 內部的版本判斷
+            def __init__(self, v="0"):
+                self.v = str(v)
+            def _t(self):
+                return [int(x) if x.isdigit() else x for x in re.split(r"[.\-]", self.v)]
+            def __lt__(self, o): o = o if isinstance(o, LooseVersion) else LooseVersion(str(o)); return self._t() <  o._t()
+            def __le__(self, o): o = o if isinstance(o, LooseVersion) else LooseVersion(str(o)); return self._t() <= o._t()
+            def __eq__(self, o): o = o if isinstance(o, LooseVersion) else LooseVersion(str(o)); return self._t() == o._t()
+            def __ne__(self, o): return not self == o
+            def __gt__(self, o): return not self <= o
+            def __ge__(self, o): return not self <  o
+
+    mod_version.LooseVersion = LooseVersion
+    sys.modules["distutils"] = mod_distutils
+    sys.modules["distutils.version"] = mod_version
+# --- End shim ---
 
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By

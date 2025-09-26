@@ -30,7 +30,7 @@ class App(tk.Tk):
         self.court_a = tk.IntVar(); self.court_b = tk.IntVar(); self.court_c = tk.IntVar()
         self.start_mode = tk.StringVar(value="now")
         self.start_time = tk.StringVar(value="23:59:55")
-        self.interval = tk.StringVar(value="1.5")
+        self.interval = tk.StringVar(value="2")
         self.max_wait_min = tk.StringVar(value="8")
         self.cf_fail_retries = tk.StringVar(value="3")
         self.single_tab_mode = tk.IntVar(value=1)
