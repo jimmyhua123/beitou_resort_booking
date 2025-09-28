@@ -4,6 +4,7 @@
 import re
 import time
 from typing import List
+import datetime as dt
 
 from dateutil import parser as dtparser
 from selenium.webdriver.common.by import By
@@ -36,6 +37,22 @@ def parse_time_hhmm(x):
 
 def build_urls(dates, d2_list):
     return [BASE_URL.format(date=d, d2=d2) for d in dates for d2 in d2_list]
+
+    try:
+        return datetime.datetime.strptime(hhmm.strip(), "%H:%M").time()
+    except Exception:
+        return None
+
+def _to_time_obj_relaxed(hhmm: str):
+    if not hhmm:
+        return None
+    s = hhmm.strip()
+    m = re.match(r'^([01]?\d|2[0-3]):([0-5]?\d)$', s)  # 分鐘允許 1~2 位數
+    if not m:
+        return None
+    hh = int(m.group(1))
+    mm = int(m.group(2))
+    return dt.time(hh, mm)
 
 # --------- 表格解析 & 點擊 ---------
 
@@ -209,6 +226,10 @@ def click_all_bookings_on_page(driver, from_t, to_t, want_A, want_B, want_C,
             pass
         return ""
 
+    # ---- 將 GUI 傳入的時間上下限轉為 time 物件（起始含、結束不含）----
+    from_obj = _to_time_obj_relaxed(from_t) if from_t else None
+    to_obj   = _to_time_obj_relaxed(to_t)   if to_t   else None
+
     clicked = 0
 
     for img in imgs:
@@ -222,11 +243,15 @@ def click_all_bookings_on_page(driver, from_t, to_t, want_A, want_B, want_C,
         t_text = _row_time(row) if row is not None else None
         c_text = _row_court(row) if row is not None else ""
 
-        # 時間/場地篩選
+        # 時間/場地篩選（用 time 物件比對，避免字串比較誤判）
         time_ok = True
-        if (from_t or to_t) and t_text:
-            if from_t and t_text < from_t: time_ok = False
-            if to_t   and t_text > to_t:   time_ok = False
+        row_obj = _to_time_obj_relaxed(t_text) if t_text else None
+        if row_obj is not None:
+            # 起點含（>= from），終點不含（< to）
+            if from_obj and row_obj < from_obj:
+                time_ok = False
+            if to_obj and row_obj >= to_obj:
+                time_ok = False
         court_ok = True
         if any([want_A, want_B, want_C]):
             up = (c_text or "").upper()
