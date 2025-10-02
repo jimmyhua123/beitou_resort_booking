@@ -1,5 +1,7 @@
 # 北投會館爬蟲／台北捷運場地半自動預約器 – README
 
+# 示範影片 https://www.youtube.com/watch?v=8dGmtffiORo
+
 一個用 **Python + Selenium (undetected-chromedriver) + Tkinter** 製作的半自動搶場地工具，支援先開登入視窗完成驗證、Cloudflare 自動驗證等待與回彈、單/多分頁輪詢、時間與 A/B/C 場地篩選，以及一鍵前往「我的訂單」。
 
 > 只操作你已登入的同一個瀏覽器實例；點擊時若遇到「驗證失敗」，會自動回彈等待 Cloudflare 通過後再重試。
