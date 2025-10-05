@@ -1,7 +1,7 @@
 # browser_cf.py
 # 管理 UC 瀏覽器 + Cloudflare 自動驗證偵測/等待 + 輕量 stealth + 失敗回彈
 
-import os
+import os,re
 import time
 from typing import Optional, Callable
 # --- Py3.12 distutils shim（必須放在 import undetected_chromedriver 之前）---
@@ -39,14 +39,38 @@ except ModuleNotFoundError:
     sys.modules["distutils.version"] = mod_version
 # --- End shim ---
 
+
+
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
+
+try:
+    import winreg  # Windows 專用
+except Exception:
+    winreg = None
+
+def get_chrome_major_windows() -> int | None:
+    """從登錄檔讀取 Chrome 版本（BLBeacon），回傳主版號，例如 140。"""
+    if winreg is None:
+        return None
+    for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+        try:
+            key = winreg.OpenKey(root, r"Software\Google\Chrome\BLBeacon")
+            version, _ = winreg.QueryValueEx(key, "version")  # 例如 '140.0.7339.208'
+            return int(version.split('.')[0])
+        except FileNotFoundError:
+            continue
+        except Exception:
+            break
+    return None
+
 
 LogFn = Callable[[str], None]
 
 LOGIN_URL = "https://resortbooking.metro.taipei/MT02.aspx?module=login_page&files=login"
 HOME_URL  = "https://resortbooking.metro.taipei/MT02.aspx?module=net_booking&files=booking_place&PT=1"
 ORDER_URL = "https://resortbooking.metro.taipei/MT02.aspx?module=member&files=orderx_mt"
+
 
 def _safe_exec_js(driver, js: str):
     try:
@@ -103,7 +127,15 @@ class BrowserManager:
         opts.add_argument("--disable-blink-features=AutomationControlled")
         opts.add_argument("--start-maximized")
 
-        drv = uc.Chrome(options=opts, headless=False)
+        # drv = uc.Chrome(options=opts, headless=False)
+        major = get_chrome_major_windows()
+        if major:
+            log(f"偵測到本機 Chrome 主版號：{major}，以該版啟動驅動…")
+            drv = uc.Chrome(options=opts, headless=False, version_main=major)
+        else:
+            log("未能偵測本機 Chrome 版本，改用 UC 預設模式啟動。")
+            drv = uc.Chrome(options=opts, headless=False)
+
         drv.implicitly_wait(0.2)
         drv.set_page_load_timeout(60)
         self.driver = drv

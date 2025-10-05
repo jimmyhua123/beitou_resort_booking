@@ -5,6 +5,8 @@ import time
 import threading
 from datetime import datetime, timedelta
 import tkinter as tk
+import argparse, os, glob, re
+
 from tkinter import ttk, scrolledtext
 
 from browser_cf import BrowserManager, LOGIN_URL, wait_until_ready_with_cf, HOME_URL,ORDER_URL
@@ -13,13 +15,39 @@ from booking import (
     click_all_bookings_on_page
 )
 
+def _next_uc_profile(base: str = "uc_profile") -> str:
+    """回傳下一個未使用的 uc_profile_XXX（3位數流水號）。"""
+    prefix = base + "_"
+    existing = [os.path.basename(p) for p in glob.glob(prefix + "*") if os.path.isdir(p)]
+    nums = []
+    for name in existing:
+        m = re.fullmatch(re.escape(prefix) + r"(\d+)", name)
+        if m:
+            nums.append(int(m.group(1)))
+    n = (max(nums) + 1) if nums else 1
+    return f"{prefix}{n:03d}"
+
+def resolve_profile_dir(profile_arg: str | None, base: str = "uc_profile") -> str:
+    """
+    將使用者輸入解析為實際的 profile 資料夾：
+      - None 或 'auto'：自動開新流水號資料夾（uc_profile_001/002/...）
+      - 'accA' 這種純標籤：使用 uc_profile_accA
+      - 包含路徑分隔符、或以 base 開頭：視為完整資料夾名稱/路徑（例如 uc_profile_007 或 C:\\path\\to\\uc_profile_foo）
+    """
+    if not profile_arg or str(profile_arg).lower() == "auto":
+        return _next_uc_profile(base)
+    if os.sep in profile_arg or profile_arg.startswith(base):
+        return profile_arg
+    return f"{base}_{profile_arg}"
+
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self, profile_dir: str = "uc_profile"):
         super().__init__()
-        self.title("台北捷運場地半自動預約器（直接點擊版）")
+        self.profile_dir = profile_dir
+        self.title(f"台北捷運場地半自動預約器（{os.path.basename(self.profile_dir)}）")
         self.geometry("980x680")
 
-        self.browser = BrowserManager(profile_dir="uc_profile")
+        self.browser = BrowserManager(profile_dir=self.profile_dir)
         self.stop_flag = threading.Event()
         self.worker_thread = None
 
@@ -96,6 +124,8 @@ class App(tk.Tk):
         self.logbox = scrolledtext.ScrolledText(self, height=22, wrap="word")
         self.logbox.pack(fill="both", expand=True, **pad)
         self._log("請先按『開啟登入視窗』→ 在 UC 瀏覽器登入；之後按『開始』。")
+        self._log(f"使用 Chrome 個人資料夾：{os.path.abspath(self.profile_dir)}")
+
 
     # ---- Log ----
     def _log(self, s: str):
@@ -259,4 +289,17 @@ class App(tk.Tk):
             self._log("任務結束。")
 
 if __name__ == "__main__":
-    App().mainloop()
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "-p", "--profile",
+        default="auto",
+        help=("Chrome Profile："
+              "'auto'＝自動開新 uc_profile_XXX；"
+              "'accA' 這種標籤會使用 uc_profile_accA；"
+              "或直接給現有資料夾/路徑（例如 uc_profile_007）。")
+    )
+    args = ap.parse_args()
+    prof_dir = resolve_profile_dir(args.profile)
+    print(f"[INFO] 本次使用 Profile：{prof_dir}")
+    App(profile_dir=prof_dir).mainloop()
+
