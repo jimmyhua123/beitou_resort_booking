@@ -9,10 +9,12 @@ python -m venv .venv
 # 打包（one-dir 推薦）
 .\.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean `
   --name "北投會館預約器" `
-  --add-data "uc_profile;uc_profile" `
   --collect-all undetected_chromedriver `
   --collect-all selenium `
   --collect-data certifi `
   --hidden-import "selenium.webdriver.common.by" `
   --hidden-import "selenium.webdriver.common.alert" `
   app.py
+
+
+  --add-data "uc_profile;uc_profile" `
